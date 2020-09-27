@@ -1,12 +1,6 @@
 type ComponentFunction<T> = (props: T) => RenderElement;
 export type Component<T> = ComponentFunction<T> | string;
 
-declare namespace JSX {
-  interface IntrinsicElements {
-    [elemName: string]: any;
-  }
-}
-
 export function isComponentFunction<T>(
   component: Component<T>
 ): component is ComponentFunction<T> {

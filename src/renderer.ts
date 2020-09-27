@@ -23,12 +23,17 @@ function syncAttributes(element: HTMLElement, props: any) {
 // Rerender is the "meat" -- replaces the content of _mountPoint_ with the
 // result of rendering _element_ to DOM. It is designed to be called again with
 // the same arguments and cause no changes to existing DOM
+// If called with a _mountPoint_ whose type does not match that of _element_'s
+// root node, _mountPoint_ will be replaced with a new node (using replaceWith).
+// If called with an EMPTY _mountPoint_, an adequate node will be created and
+// returned.
 function rerender(element: RenderElement, mountPoint: Node | null): Node {
   if (isElementObject(element)) {
     if (isComponentFunction(element.type)) {
       // Element.type is a function, call it to get what should be rendered, and
       // then recurse
-      // TODO:
+      // TODO: Listen for all observables that are accessed during this render
+      // and automatically listen for changes. On a change, call rerender again.
       const newElement = element.type(element.props);
       return rerender(newElement, mountPoint);
     } else {
@@ -43,6 +48,8 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
         if (mountPoint) {
           debug("Replacing", mountPoint, "with", newMountPoint);
           (mountPoint as Element).replaceWith(newMountPoint);
+        } else {
+          debug("Creating non-text node:", newMountPoint);
         }
         mountPoint = newMountPoint;
       }
@@ -52,7 +59,7 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
       for (let i = 0; i < mountPoint.childNodes.length; i++) {
         const childNode = mountPoint.childNodes[i];
         if (i >= element.children.length) {
-          debug("removing", childNode);
+          debug("Removing", childNode);
           childNode.remove(); // Element no longer exists
           continue;
         }
@@ -61,11 +68,11 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
       for (let i = childIndex; i < element.children.length; i++) {
         // Build new nodes for each unrendered child
         const newNode = rerender(element.children[i], null);
-        debug("Adding new child: ", newNode);
         mountPoint.appendChild(newNode);
       }
     }
   } else {
+    // Element is a string, so we should be building a text node.
     // First, make sure mountPoint is a text node. If it isn't replace it with
     // one
     if (!mountPoint || mountPoint.nodeType !== Node.TEXT_NODE) {
@@ -73,12 +80,12 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
       if (mountPoint) {
         debug("Replacing", mountPoint, "with", element);
         (mountPoint as Element).replaceWith(newMountPoint);
+      } else {
+        debug("Creating text node:", newMountPoint);
       }
       mountPoint = newMountPoint;
     }
-    if (mountPoint.textContent === element) {
-      debug("Skipping render");
-    } else {
+    if (mountPoint.textContent !== element) {
       debug(
         "Changing text from '" +
           mountPoint.textContent +
@@ -94,7 +101,13 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
 
 export function render(element: RenderElement, mountPoint: HTMLElement): void {
   // Get HTML content from element and set mountPoint.innerHTML
-  rerender(element, mountPoint.childNodes[0]);
+  debug("Starting render", element);
+  if (mountPoint.childNodes[0]) {
+    rerender(element, mountPoint.childNodes[0]);
+  } else {
+    const node = rerender(element, null);
+    mountPoint.appendChild(node);
+  }
 }
 
 export function h<T>(
