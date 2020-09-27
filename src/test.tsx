@@ -2,15 +2,24 @@ import { render, h } from "./renderer";
 import { observable } from "mobx";
 
 function assert(check: () => any) {
-  if (!check()) {
+  let result;
+  try {
+    result = check();
+  } catch (e) {
+    throw new Error(
+      "AssertionError: Could not calculate assertion: " + check.toString()
+    );
+  }
+  if (!result) {
     throw new Error("AssertionError: " + check.toString());
   }
 }
 
-export function test() {
-  const root = document.getElementById("root");
-  if (!root) throw new Error("No root element in page, cannot perform tests.");
+function childNode(element: HTMLElement) {
+  return element.childNodes[0] as HTMLElement;
+}
 
+function testBasic(root: HTMLElement) {
   render(<div style="color: red">Hello world from rendertree</div>, root);
 
   let beforeElement = root.childNodes[0];
@@ -62,7 +71,7 @@ export function test() {
     root
   );
 
-  assert(() => !(root.childNodes[0] as HTMLElement).getAttribute("style"));
+  assert(() => !childNode(root).getAttribute("style"));
 
   // Replace HTML nodes with text node
   render(<div>One</div>, root);
@@ -72,7 +81,7 @@ export function test() {
   render(<MyComponent name="world" />, root);
   beforeElement = root.childNodes[0];
 
-  assert(() => (root.childNodes[0] as HTMLElement).innerText === "Hello world");
+  assert(() => childNode(root).innerText === "Hello world");
 
   render(<MyComponent name="world" />, root);
 
@@ -89,7 +98,45 @@ function testObservability(root: HTMLElement) {
   const state = observable({ count: 0 });
   const ObservableComponent = () => <div>Count: {state.count}</div>;
   render(<ObservableComponent />, root);
-  assert(() => (root.childNodes[0] as HTMLElement).innerText === "Count: 0");
+  assert(() => childNode(root).innerText === "Count: 0");
   state.count++;
-  assert(() => (root.childNodes[0] as HTMLElement).innerText === "Count: 1");
+  assert(() => childNode(root).innerText === "Count: 1");
+
+  render(null, root);
+
+  render(<ObservableComponent />, root);
+  render(<div>Not observable</div>, root);
+  state.count++;
+  assert(() => childNode(root).innerText === "Not observable");
+
+  render(null, root);
+
+  state.count = 0;
+  const ObservableNullComponent = () =>
+    state.count > 0 ? <div>Something</div> : null;
+  render(<ObservableNullComponent />, root);
+  assert(() => !childNode(root));
+  state.count = 1;
+  assert(() => childNode(root).innerText === "Something");
+
+  state.count = 0;
+  assert(() => !childNode(root));
+  render(null, root);
+  render(
+    <div>
+      <ObservableNullComponent />
+      <ObservableNullComponent />
+    </div>,
+    root
+  );
+}
+
+export function test() {
+  const root = document.getElementById("root");
+  if (!root) throw new Error("No root element in page, cannot perform tests.");
+
+  for (let testFunc of [testBasic, testObservability]) {
+    root.innerHTML = "";
+    testFunc(root);
+  }
 }

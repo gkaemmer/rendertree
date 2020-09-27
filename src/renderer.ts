@@ -5,6 +5,7 @@ import {
   Component,
 } from "./types";
 import { debug } from "./debug";
+import { reaction, when, IReactionDisposer } from "mobx";
 
 const defaultProps = {};
 
@@ -20,6 +21,10 @@ function syncAttributes(element: HTMLElement, props: any) {
   }
 }
 
+const disposers = new WeakMap<Node, IReactionDisposer>();
+const elementsByNode = new WeakMap<Node, RenderElement>();
+// const mountPointsByElements = new WeakMap<RenderElement, Node>();
+
 // Rerender is the "meat" -- replaces the content of _mountPoint_ with the
 // result of rendering _element_ to DOM. It is designed to be called again with
 // the same arguments and cause no changes to existing DOM
@@ -29,8 +34,15 @@ function syncAttributes(element: HTMLElement, props: any) {
 // returned.
 function rerender(
   element: RenderElement | null,
-  mountPoint: Node | null
+  mountPoint: Node | null,
+  parent: Node,
+  prevNode: Node | null
 ): Node | null {
+  if (mountPoint && disposers.has(mountPoint)) {
+    const disposer = disposers.get(mountPoint) as IReactionDisposer;
+    disposer();
+    disposers.delete(mountPoint);
+  }
   if (element === null) {
     // When element is null, simply remove mountPoint
     mountPoint?.parentElement?.removeChild(mountPoint);
@@ -40,8 +52,49 @@ function rerender(
       // then recurse
       // TODO: Listen for all observables that are accessed during this render
       // and automatically listen for changes. On a change, call rerender again.
-      const newElement = element.type(element.props);
-      return rerender(newElement, mountPoint);
+      let newElement = null;
+      const componentFunction = element.type;
+      let renderWasNull = false;
+      const disposer = reaction(
+        () => {
+          newElement = componentFunction(element.props);
+          return newElement;
+        },
+        (newElement: RenderElement) => {
+          console.log("Rerendering due to an observable change", renderWasNull);
+          if (!renderWasNull) {
+            console.log("Rerendering mountPoint because render was not null");
+            rerender(newElement, mountPoint, parent, prevNode);
+          } else if (elementsByNode.has(parent)) {
+            // Rerender parent when render was null
+            console.log("Rerendering parent because render was null");
+            const parentElement = elementsByNode.get(parent) as RenderElement;
+            rerender(
+              parentElement,
+              parent,
+              parent.parentElement as Node,
+              parent.previousSibling
+            );
+          } else {
+            console.log(
+              "Rerendering and auto-appending because root render was null"
+            );
+            // Render was null last time AND parent element doesn't exist, so
+            // this must be the root. So we can just use appendChild to get it
+            // there.
+            const newNode = rerender(newElement, null, parent, prevNode);
+            if (newNode) parent.appendChild(newNode);
+          }
+        }
+      );
+      mountPoint = rerender(newElement, mountPoint, parent, prevNode);
+      if (mountPoint) {
+        disposers.set(mountPoint, disposer);
+      } else {
+        // Nothing was rendered, clear this observer ONLY when parent is re-rendered
+        renderWasNull = true;
+        disposers.set(parent, disposer);
+      }
     } else {
       // Element.type is a raw HTML type, sync mountPoint with that raw node
       // First, check if mountPoint can be re-used for this element
@@ -64,36 +117,42 @@ function rerender(
 
       syncAttributes(mountPoint as HTMLElement, element.props);
       let childIndex = mountPoint.childNodes.length;
+      let prevChild: Node | null = null;
       for (let i = 0; i < mountPoint.childNodes.length; i++) {
         const childNode = mountPoint.childNodes[i];
         if (i >= childElements.length) {
           debug("Removing", childNode);
           childNode.remove(); // Element no longer exists
-          continue;
+        } else {
+          rerender(childElements[i], childNode, mountPoint, prevChild);
         }
-        rerender(childElements[i], childNode);
+        prevChild = childNode;
       }
       for (let i = childIndex; i < childElements.length; i++) {
         // Build new nodes for each unrendered child
-        const newNode = rerender(childElements[i], null);
-        if (newNode) mountPoint.appendChild(newNode);
+        const newNode = rerender(childElements[i], null, mountPoint, prevChild);
+        if (newNode) {
+          mountPoint.appendChild(newNode);
+          prevChild = newNode;
+        }
       }
     }
   } else {
     // Element is a string, so we should be building a text node.
     // First, make sure mountPoint is a text node. If it isn't replace it with
     // one
+    const newContent = element.toString();
     if (!mountPoint || mountPoint.nodeType !== Node.TEXT_NODE) {
-      const newMountPoint = document.createTextNode(element.toString());
+      const newMountPoint = document.createTextNode(newContent);
       if (mountPoint) {
         debug("Replacing", mountPoint, "with", element);
         (mountPoint as Element).replaceWith(newMountPoint);
       } else {
-        debug("Creating text node:", newMountPoint);
+        debug("Creating text node:", newContent);
       }
       mountPoint = newMountPoint;
     }
-    if (mountPoint.textContent !== element) {
+    if (mountPoint.textContent !== newContent) {
       debug(
         "Changing text from '" +
           mountPoint.textContent +
@@ -101,9 +160,10 @@ function rerender(
           element +
           "'"
       );
-      mountPoint.textContent = element.toString();
+      mountPoint.textContent = newContent;
     }
   }
+  if (mountPoint && element) elementsByNode.set(mountPoint, element);
   return mountPoint;
 }
 
@@ -114,9 +174,9 @@ export function render(
   // Get HTML content from element and set mountPoint.innerHTML
   debug("Starting render", element);
   if (mountPoint.childNodes[0]) {
-    rerender(element, mountPoint.childNodes[0]);
+    rerender(element, mountPoint.childNodes[0], mountPoint, null);
   } else {
-    const node = rerender(element, null);
+    const node = rerender(element, null, mountPoint, null);
     if (node) mountPoint.appendChild(node);
   }
 }
