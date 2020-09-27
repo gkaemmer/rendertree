@@ -31,7 +31,7 @@ function rerender(
   element: RenderElement | null,
   mountPoint: Node | null
 ): Node | null {
-  if (!element) {
+  if (element === null) {
     // When element is null, simply remove mountPoint
     mountPoint?.parentElement?.removeChild(mountPoint);
   } else if (isElementObject(element)) {
@@ -45,7 +45,7 @@ function rerender(
     } else {
       // Element.type is a raw HTML type, sync mountPoint with that raw node
       // First, check if mountPoint can be re-used for this element
-      const childElements = element.children.filter((child) => child);
+      const childElements = element.children.filter((child) => child !== null);
 
       if (
         !mountPoint ||
@@ -84,7 +84,7 @@ function rerender(
     // First, make sure mountPoint is a text node. If it isn't replace it with
     // one
     if (!mountPoint || mountPoint.nodeType !== Node.TEXT_NODE) {
-      const newMountPoint = document.createTextNode(element);
+      const newMountPoint = document.createTextNode(element.toString());
       if (mountPoint) {
         debug("Replacing", mountPoint, "with", element);
         (mountPoint as Element).replaceWith(newMountPoint);
@@ -101,7 +101,7 @@ function rerender(
           element +
           "'"
       );
-      mountPoint.textContent = element;
+      mountPoint.textContent = element.toString();
     }
   }
   return mountPoint;

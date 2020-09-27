@@ -18,5 +18,5 @@ export type RenderElement = RenderElementObject | string;
 export function isElementObject(
   element: RenderElement
 ): element is RenderElementObject {
-  return typeof element !== "string";
+  return typeof element === "object";
 }
