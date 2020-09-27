@@ -1,4 +1,5 @@
 import { render, h } from "./renderer";
+import { observable } from "mobx";
 
 function assert(check: () => any) {
   if (!check()) {
@@ -81,10 +82,14 @@ export function test() {
 
   assert(() => root.childNodes.length === 0);
 
-  testObservability();
+  testObservability(root);
 }
 
-function testObservability() {
-  const root = document.getElementById("");
-  // render()
+function testObservability(root: HTMLElement) {
+  const state = observable({ count: 0 });
+  const ObservableComponent = () => <div>Count: {state.count}</div>;
+  render(<ObservableComponent />, root);
+  assert(() => (root.childNodes[0] as HTMLElement).innerText === "Count: 0");
+  state.count++;
+  assert(() => (root.childNodes[0] as HTMLElement).innerText === "Count: 1");
 }

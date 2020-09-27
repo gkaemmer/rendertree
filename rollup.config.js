@@ -4,7 +4,6 @@ export default {
   input: "src/index.ts",
   output: {
     dir: "out",
-    format: "cjs",
   },
   plugins: [typescript()],
 };
