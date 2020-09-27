@@ -1,5 +1,5 @@
-type ComponentFunction<T> = ((props: T) => RenderElement);
-type Component<T> = ComponentFunction<T> | string;
+type ComponentFunction<T> = (props: T) => RenderElement;
+export type Component<T> = ComponentFunction<T> | string;
 
 declare namespace JSX {
   interface IntrinsicElements {
@@ -7,8 +7,8 @@ declare namespace JSX {
   }
 }
 
-function isComponentFunction<T>(
-  component: Component<T>,
+export function isComponentFunction<T>(
+  component: Component<T>
 ): component is ComponentFunction<T> {
   return typeof component !== "string";
 }
@@ -19,10 +19,10 @@ interface RenderElementObject {
   children: RenderElement[];
 }
 
-type RenderElement = RenderElementObject | string;
+export type RenderElement = RenderElementObject | string;
 
-function isElementObject(
-  element: RenderElement,
+export function isElementObject(
+  element: RenderElement
 ): element is RenderElementObject {
   return typeof element !== "string";
 }

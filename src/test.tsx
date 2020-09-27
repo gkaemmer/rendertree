@@ -1,10 +1,12 @@
+import { render, h } from "./renderer";
+
 function assert(check: () => any) {
   if (!check()) {
     throw new Error("AssertionError: " + check.toString());
   }
 }
 
-window.onload = () => {
+export function test() {
   const root = document.getElementById("root");
 
   render(<div style="color: red">Hello world from rendertree</div>, root);
@@ -13,7 +15,7 @@ window.onload = () => {
 
   render(
     <div style="color: red">Hello world from rendertree again!</div>,
-    root,
+    root
   );
 
   const secondChildElement = root.childNodes[0];
@@ -27,7 +29,7 @@ window.onload = () => {
       <div>Two</div>
       <div>Three</div>
     </div>,
-    root,
+    root
   );
 
   beforeElement = root.childNodes[0].childNodes[1];
@@ -39,7 +41,7 @@ window.onload = () => {
       <div>One</div>
       <div>Two</div>
     </div>,
-    root,
+    root
   );
 
   assert(() => root.childNodes[0].childNodes[1] == beforeElement);
@@ -49,7 +51,7 @@ window.onload = () => {
       <div>One</div>
       <section>Two</section>
     </div>,
-    root,
+    root
   );
 
   render(
@@ -57,16 +59,13 @@ window.onload = () => {
       <div>One</div>
       <section>Two</section>
     </div>,
-    root,
+    root
   );
 
   assert(() => !(root.childNodes[0] as HTMLElement).getAttribute("style"));
 
   // Replace HTML nodes with text node
-  render(
-    <div>One</div>,
-    root,
-  );
+  render(<div>One</div>, root);
 
   const MyComponent = ({ name }: any) => <div>Hello {name}</div>;
 
@@ -77,5 +76,5 @@ window.onload = () => {
 
   render(<MyComponent name="world" />, root);
 
-  assert(() => (root.childNodes[0]) == beforeElement);
-};
+  assert(() => root.childNodes[0] == beforeElement);
+}

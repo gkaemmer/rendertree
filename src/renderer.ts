@@ -1,3 +1,11 @@
+import {
+  RenderElement,
+  isElementObject,
+  isComponentFunction,
+  Component,
+} from "./types";
+import { debug } from "./debug";
+
 function renderToNode(element: RenderElement): Node {
   if (isElementObject(element)) {
     if (isComponentFunction(element.type)) {
@@ -90,7 +98,7 @@ function rerender(element: RenderElement, mountPoint: Node): void {
   }
 }
 
-function render(element: RenderElement, mountPoint: HTMLElement): void {
+export function render(element: RenderElement, mountPoint: HTMLElement): void {
   // Get HTML content from element and set mountPoint.innerHTML
   if (mountPoint.childNodes[0]) {
     rerender(element, mountPoint.childNodes[0]);
@@ -100,7 +108,7 @@ function render(element: RenderElement, mountPoint: HTMLElement): void {
   }
 }
 
-function h<T>(
+export function h<T>(
   type: Component<T>,
   props: T,
   ...children: RenderElement[]
@@ -108,4 +116,4 @@ function h<T>(
   return { type, props, children };
 }
 
-window.h = h;
+(window as any).h = h;
