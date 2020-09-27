@@ -5,6 +5,7 @@
     "allowSyntheticDefaultImports": true,
     "target": "es6",
     "noImplicitAny": true,
+    "strict": true,
     "moduleResolution": "node",
     "jsxFactory": "h",
     "jsx": "react",

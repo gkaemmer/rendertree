@@ -27,8 +27,14 @@ function syncAttributes(element: HTMLElement, props: any) {
 // root node, _mountPoint_ will be replaced with a new node (using replaceWith).
 // If called with an EMPTY _mountPoint_, an adequate node will be created and
 // returned.
-function rerender(element: RenderElement, mountPoint: Node | null): Node {
-  if (isElementObject(element)) {
+function rerender(
+  element: RenderElement | null,
+  mountPoint: Node | null
+): Node | null {
+  if (!element) {
+    // When element is null, simply remove mountPoint
+    mountPoint?.parentElement?.removeChild(mountPoint);
+  } else if (isElementObject(element)) {
     if (isComponentFunction(element.type)) {
       // Element.type is a function, call it to get what should be rendered, and
       // then recurse
@@ -39,6 +45,8 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
     } else {
       // Element.type is a raw HTML type, sync mountPoint with that raw node
       // First, check if mountPoint can be re-used for this element
+      const childElements = element.children.filter((child) => child);
+
       if (
         !mountPoint ||
         mountPoint.nodeType !== Node.ELEMENT_NODE ||
@@ -58,17 +66,17 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
       let childIndex = mountPoint.childNodes.length;
       for (let i = 0; i < mountPoint.childNodes.length; i++) {
         const childNode = mountPoint.childNodes[i];
-        if (i >= element.children.length) {
+        if (i >= childElements.length) {
           debug("Removing", childNode);
           childNode.remove(); // Element no longer exists
           continue;
         }
-        rerender(element.children[i], childNode);
+        rerender(childElements[i], childNode);
       }
-      for (let i = childIndex; i < element.children.length; i++) {
+      for (let i = childIndex; i < childElements.length; i++) {
         // Build new nodes for each unrendered child
-        const newNode = rerender(element.children[i], null);
-        mountPoint.appendChild(newNode);
+        const newNode = rerender(childElements[i], null);
+        if (newNode) mountPoint.appendChild(newNode);
       }
     }
   } else {
@@ -99,14 +107,17 @@ function rerender(element: RenderElement, mountPoint: Node | null): Node {
   return mountPoint;
 }
 
-export function render(element: RenderElement, mountPoint: HTMLElement): void {
+export function render(
+  element: RenderElement | null,
+  mountPoint: HTMLElement
+): void {
   // Get HTML content from element and set mountPoint.innerHTML
   debug("Starting render", element);
   if (mountPoint.childNodes[0]) {
     rerender(element, mountPoint.childNodes[0]);
   } else {
     const node = rerender(element, null);
-    mountPoint.appendChild(node);
+    if (node) mountPoint.appendChild(node);
   }
 }
 

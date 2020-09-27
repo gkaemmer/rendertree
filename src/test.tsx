@@ -8,6 +8,7 @@ function assert(check: () => any) {
 
 export function test() {
   const root = document.getElementById("root");
+  if (!root) throw new Error("No root element in page, cannot perform tests.");
 
   render(<div style="color: red">Hello world from rendertree</div>, root);
 
@@ -17,8 +18,6 @@ export function test() {
     <div style="color: red">Hello world from rendertree again!</div>,
     root
   );
-
-  const secondChildElement = root.childNodes[0];
 
   assert(() => root.innerText === "Hello world from rendertree again!");
   assert(() => root.childNodes[0] == beforeElement);
@@ -77,4 +76,15 @@ export function test() {
   render(<MyComponent name="world" />, root);
 
   assert(() => root.childNodes[0] == beforeElement);
+
+  render(null, root);
+
+  assert(() => root.childNodes.length === 0);
+
+  testObservability();
+}
+
+function testObservability() {
+  const root = document.getElementById("");
+  // render()
 }
