@@ -32,6 +32,7 @@ function rerender(element: RenderElement, mountPoint: Node): void {
     if (isComponentFunction(element.type)) {
       // Element.type is a function, call it to get what should be rendered, and
       // then recurse
+
       const newElement = element.type(element.props);
       rerender(newElement, mountPoint);
     } else {
@@ -41,8 +42,8 @@ function rerender(element: RenderElement, mountPoint: Node): void {
         mountPoint.nodeType !== Node.ELEMENT_NODE ||
         mountPoint.nodeName !== element.type.toUpperCase()
       ) {
-        debug("Replacing", mountPoint, "with", element);
         const newMountPoint = document.createElement(element.type);
+        debug("Replacing", mountPoint, "with", newMountPoint);
         (mountPoint as Element).replaceWith(newMountPoint);
         mountPoint = newMountPoint;
       }
@@ -60,8 +61,9 @@ function rerender(element: RenderElement, mountPoint: Node): void {
       }
       for (let i = childIndex; i < element.children.length; i++) {
         // Build new nodes for each unrendered child
-        debug("Adding new child for", element.children[i]);
-        mountPoint.appendChild(renderToNode(element.children[i]));
+        const newNode = renderToNode(element.children[i]);
+        debug("Adding new child: ", newNode);
+        mountPoint.appendChild(newNode);
       }
     }
   } else {
@@ -77,8 +79,11 @@ function rerender(element: RenderElement, mountPoint: Node): void {
       debug("Skipping render");
     } else {
       debug(
-        "Changing text from '" + mountPoint.textContent + "' to '" + element +
-          "'",
+        "Changing text from '" +
+          mountPoint.textContent +
+          "' to '" +
+          element +
+          "'"
       );
       mountPoint.textContent = element;
     }
