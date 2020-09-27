@@ -7,6 +7,8 @@ import {
 import { debug } from "./debug";
 import { reaction, when, IReactionDisposer } from "mobx";
 
+type DOMNode = Text | Element;
+
 const defaultProps = {};
 
 function syncAttributes(element: HTMLElement, props: any) {
@@ -22,8 +24,15 @@ function syncAttributes(element: HTMLElement, props: any) {
 }
 
 const disposers = new WeakMap<Node, IReactionDisposer>();
-const elementsByNode = new WeakMap<Node, RenderElement>();
-// const mountPointsByElements = new WeakMap<RenderElement, Node>();
+
+function createNullNode(): DOMNode {
+  // We use empty text nodes as NULL (simpler than deleting null nodes from the tree)
+  return document.createTextNode("");
+}
+
+function isNullNode(node: DOMNode) {
+  return node.nodeType === Node.TEXT_NODE && node.textContent === "";
+}
 
 // Rerender is the "meat" -- replaces the content of _mountPoint_ with the
 // result of rendering _element_ to DOM. It is designed to be called again with
@@ -34,18 +43,23 @@ const elementsByNode = new WeakMap<Node, RenderElement>();
 // returned.
 function rerender(
   element: RenderElement | null,
-  mountPoint: Node | null,
-  parent: Node,
-  prevNode: Node | null
-): Node | null {
-  if (mountPoint && disposers.has(mountPoint)) {
+  mountPoint: DOMNode | null,
+  parent: DOMNode,
+  clearObserver: boolean = true
+): DOMNode {
+  if (clearObserver && mountPoint && disposers.has(mountPoint)) {
     const disposer = disposers.get(mountPoint) as IReactionDisposer;
     disposer();
     disposers.delete(mountPoint);
   }
   if (element === null) {
-    // When element is null, simply remove mountPoint
-    mountPoint?.parentElement?.removeChild(mountPoint);
+    // When element is null, replace mountPoint with a null node
+    if (!mountPoint) {
+      mountPoint = createNullNode();
+    } else if (!isNullNode(mountPoint)) {
+      const newMountPoint = createNullNode();
+      mountPoint.replaceWith(newMountPoint);
+    }
   } else if (isElementObject(element)) {
     if (isComponentFunction(element.type)) {
       // Element.type is a function, call it to get what should be rendered, and
@@ -54,51 +68,24 @@ function rerender(
       // and automatically listen for changes. On a change, call rerender again.
       let newElement = null;
       const componentFunction = element.type;
-      let renderWasNull = false;
       const disposer = reaction(
         () => {
           newElement = componentFunction(element.props);
           return newElement;
         },
         (newElement: RenderElement) => {
-          console.log("Rerendering due to an observable change", renderWasNull);
-          if (!renderWasNull) {
-            console.log("Rerendering mountPoint because render was not null");
-            rerender(newElement, mountPoint, parent, prevNode);
-          } else if (elementsByNode.has(parent)) {
-            // Rerender parent when render was null
-            console.log("Rerendering parent because render was null");
-            const parentElement = elementsByNode.get(parent) as RenderElement;
-            rerender(
-              parentElement,
-              parent,
-              parent.parentElement as Node,
-              parent.previousSibling
-            );
-          } else {
-            console.log(
-              "Rerendering and auto-appending because root render was null"
-            );
-            // Render was null last time AND parent element doesn't exist, so
-            // this must be the root. So we can just use appendChild to get it
-            // there.
-            const newNode = rerender(newElement, null, parent, prevNode);
-            if (newNode) parent.appendChild(newNode);
-          }
+          console.log("Rerendering due to an observable change", newElement);
+          // Set clearObserver to FALSE to avoid clearing the observer for this
+          // mountpoint
+          mountPoint = rerender(newElement, mountPoint, parent, false);
         }
       );
-      mountPoint = rerender(newElement, mountPoint, parent, prevNode);
-      if (mountPoint) {
-        disposers.set(mountPoint, disposer);
-      } else {
-        // Nothing was rendered, clear this observer ONLY when parent is re-rendered
-        renderWasNull = true;
-        disposers.set(parent, disposer);
-      }
+      mountPoint = rerender(newElement, mountPoint, parent);
+      disposers.set(mountPoint, disposer);
     } else {
       // Element.type is a raw HTML type, sync mountPoint with that raw node
       // First, check if mountPoint can be re-used for this element
-      const childElements = element.children.filter((child) => child !== null);
+      const childElements = element.children;
 
       if (
         !mountPoint ||
@@ -117,24 +104,22 @@ function rerender(
 
       syncAttributes(mountPoint as HTMLElement, element.props);
       let childIndex = mountPoint.childNodes.length;
-      let prevChild: Node | null = null;
+      let prevChild: DOMNode | null = null;
       for (let i = 0; i < mountPoint.childNodes.length; i++) {
-        const childNode = mountPoint.childNodes[i];
+        const childNode = mountPoint.childNodes[i] as DOMNode;
         if (i >= childElements.length) {
           debug("Removing", childNode);
           childNode.remove(); // Element no longer exists
         } else {
-          rerender(childElements[i], childNode, mountPoint, prevChild);
+          rerender(childElements[i], childNode, mountPoint);
         }
         prevChild = childNode;
       }
       for (let i = childIndex; i < childElements.length; i++) {
         // Build new nodes for each unrendered child
-        const newNode = rerender(childElements[i], null, mountPoint, prevChild);
-        if (newNode) {
-          mountPoint.appendChild(newNode);
-          prevChild = newNode;
-        }
+        const newNode = rerender(childElements[i], null, mountPoint);
+        mountPoint.appendChild(newNode);
+        prevChild = newNode;
       }
     }
   } else {
@@ -163,7 +148,6 @@ function rerender(
       mountPoint.textContent = newContent;
     }
   }
-  if (mountPoint && element) elementsByNode.set(mountPoint, element);
   return mountPoint;
 }
 
@@ -174,9 +158,9 @@ export function render(
   // Get HTML content from element and set mountPoint.innerHTML
   debug("Starting render", element);
   if (mountPoint.childNodes[0]) {
-    rerender(element, mountPoint.childNodes[0], mountPoint, null);
+    rerender(element, mountPoint.childNodes[0] as DOMNode, mountPoint);
   } else {
-    const node = rerender(element, null, mountPoint, null);
+    const node = rerender(element, null, mountPoint);
     if (node) mountPoint.appendChild(node);
   }
 }

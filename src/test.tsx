@@ -89,7 +89,7 @@ function testBasic(root: HTMLElement) {
 
   render(null, root);
 
-  assert(() => root.childNodes.length === 0);
+  assert(() => root.innerText === "");
 
   testObservability(root);
 }
@@ -115,12 +115,13 @@ function testObservability(root: HTMLElement) {
   const ObservableNullComponent = () =>
     state.count > 0 ? <div>Something</div> : null;
   render(<ObservableNullComponent />, root);
-  assert(() => !childNode(root));
+  assert(() => root.innerText === "");
   state.count = 1;
   assert(() => childNode(root).innerText === "Something");
-
+  console.log("Setting state to 0");
   state.count = 0;
-  assert(() => !childNode(root));
+  assert(() => root.innerText === "");
+
   render(null, root);
   render(
     <div>
