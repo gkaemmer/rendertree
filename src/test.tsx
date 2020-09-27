@@ -51,4 +51,14 @@ window.onload = () => {
     </div>,
     root,
   );
+
+  render(
+    <div>
+      <div>One</div>
+      <section>Two</section>
+    </div>,
+    root,
+  );
+
+  assert(() => !(root.childNodes[0] as HTMLElement).getAttribute("style"));
 };

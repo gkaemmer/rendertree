@@ -12,12 +12,26 @@ function renderToNode(element: RenderElement): Node {
   }
 }
 
+const defaultProps = {};
+
+function syncAttributes(element: HTMLElement, props: any) {
+  if (!props) {
+    props = defaultProps;
+  }
+  for (let attr of element.attributes) {
+    if (typeof props[attr.name] === "undefined") {
+      element.removeAttribute(attr.name);
+    }
+  }
+  for (let key in props) {
+    element.setAttribute(key, props[key]);
+  }
+}
+
 function rerender(element: RenderElement, mountPoint: Node): void {
   // precondition: can rerender
   if (isElementObject(element)) {
-    for (let key in element.props) {
-      (mountPoint as HTMLElement).setAttribute(key, element.props[key]);
-    }
+    syncAttributes(mountPoint as HTMLElement, element.props);
     let childIndex = mountPoint.childNodes.length;
     for (let i = 0; i < mountPoint.childNodes.length; i++) {
       const childNode = mountPoint.childNodes[i];
